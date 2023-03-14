@@ -1,0 +1,747 @@
+---
+title: "CAL Plots [VERSION 1]"
+author: "Corey A. Rynders, PhD"
+date: "02-APR-2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# Instructions:
+
+------------------------------------------------------------
+
+## Step 1: Customize the location of your files
+
+**Note that this step only needs to be completed if this is the first time you are running the program on your computer**
+
+```{r}
+
+#Please copy and paste the pathname of the INPUT folder on your computer between parentheses in the line of code below
+input.dir <- "/Users/stein/Desktop/CAL PLOT/INPUT_EU"
+
+
+#Please copy and paste the pathname of the INPUT folder on your computer between parentheses in the line of code below
+input_comp.dir <- "/Users/stein/Desktop/CAL PLOT/INPUT_OF"
+
+
+#Please copy and paste the pathname of the ARCHIVE folder on your computer between parentheses in the line of code below
+archive.dir <- "/Users/stein/Desktop/CAL PLOT/ARCHIVE"
+
+#Please copy and paste the pathname of the OUTPUT folder on your computer between parentheses in the line of code below
+output.dir <-  "/Users/stein/Desktop/CAL PLOT/OUTPUT"
+
+#Note that there should NOT be a "/" or "\" at the end of each pathname!!
+
+```
+
+------------------------------------------------------------
+
+------------------------------------------------------------
+
+## Step 2: Check Nameing Convention Compliance 
+
+**Before running this program please make sure that the chamber files have the correct naming convention.**
+
+**Format all ARROW study file names like this  -> PID_Condition_ProtocolDay_extracted -> 91001_EU_N6_extracted or 91001_EU_D7_extracted or 91001_OF_N6_extracted or 91001_OF_D7_extracted**
+
+------------------------------------------------------------
+
+------------------------------------------------------------
+
+## Step 3: Place a copy of the .txt file that you want analyzed in the INPUT folder
+
+------------------------------------------------------------
+
+------------------------------------------------------------
+
+## Step 4: Run the program
+
+Select RUN (see top right-hand corner of the code viewer pane) -> RUN ALL
+
+------------------------------------------------------------
+
+------------------------------------------------------------
+PROGRAM CODE BELOW (DO NOT MODIFY ANYTHING BELOW THIS LINE)
+------------------------------------------------------------
+
+## Import Data 
+
+```{r}
+
+#RUN FOR THE EU CONDITION
+
+#Names of the files in the input directory
+input.file <- list.files(input.dir, full.names = TRUE)
+
+#Name of the .txt file
+txt.file <-
+  list.files(path = input.dir,
+             pattern = "*.txt",
+             full.names = TRUE)
+
+#Library needed to execute the import function
+library(data.table)
+
+#Funtion that imports a .txt file and creates a new column with the name of the source file
+import.fx <- function(x) {
+  out <- fread(x, header = TRUE)
+  out$source_file <- x
+  return(out)
+}
+
+#Import the chamber data into a data.frame for analysis
+ch <- import.fx(txt.file)
+
+#Libraries needed to move the new chamber test data to the archived folder
+library(stringr)
+library(filesstrings)
+
+#Move the files from the input folder to the archive
+file.move(input.file, archive.dir)
+```
+
+
+## Import comparison data
+
+```{r}
+#RUN FOR THE OF CONDITION
+
+
+#Names of the files in the input directory
+input_comp.file <- list.files(input_comp.dir, full.names = TRUE)
+
+#Name of the .txt file
+txt.file <-
+  list.files(path = input_comp.dir,
+             pattern = "*.txt",
+             full.names = TRUE)
+
+#Library needed to execute the import function
+library(data.table)
+
+#Import the chamber data into a data.frame for analysis
+ch_comp <- import.fx(txt.file)
+
+#Libraries needed to move the new chamber test data to the archived folder
+library(stringr)
+library(filesstrings)
+
+#Move the files from the input folder to the archive
+file.move(input_comp.file, archive.dir)
+```
+
+
+
+
+## Calculations and Results Table
+
+```{r}
+
+library(tidyverse)
+#-------------------------------------------
+#EU condition
+ch  <- ch %>% 
+  mutate(index = row_number()) 
+#OF condition
+ch_comp  <- ch_comp %>% 
+  mutate(index = row_number()) 
+#-------------------------------------------
+
+#Minutes of data collected
+#EU condition
+duration <- length(ch$kcal_min)
+#OF condition
+duration_comp <- length(ch_comp$kcal_min)
+
+#-------------------------------------------
+#Sum of VO2 column
+#EU condition
+VO2_actual <- sum(ch$VO2)
+#OF condition
+VO2_actual_comp <- sum(ch_comp$VO2)
+
+#-------------------------------------------
+#Sum of VCO2 column
+#EU condition
+VCO2_actual <- sum(ch$VCO2)
+#OF condition
+VCO2_actual_comp <- sum(ch_comp$VCO2)
+
+#-------------------------------------------
+#Sum of EE column
+#EU condition
+EE_actual <- sum(ch$kcal_min)
+#OF condition
+EE_actual_comp <- sum(ch_comp$kcal_min)
+
+#-------------------------------------------
+
+#EE total / total duration
+#EU condition
+EE_kcal_min_actual <- EE_actual / duration
+#OF condition
+EE_kcal_min_actual_comp <- EE_actual_comp / duration_comp
+#-------------------------------------------
+
+#EE 24
+#EU condition
+EE_actual <- EE_kcal_min_actual * 1440
+#OF condition
+EE_actual_comp <- EE_kcal_min_actual_comp * 1440
+
+#-------------------------------------------
+#EU condition
+RER_actual <- mean(ch$RQ)
+#OF condition
+RER_actual_comp <- mean(ch_comp$RQ)
+
+RER_expected <- NA     #check here if something fails
+
+#-------------------------------------------
+#EU condition
+RER_sd <- sd(ch$RQ)
+#OF condition
+RER_sd_comp <- sd(ch_comp$RQ)
+
+#-------------------------------------------
+#EU condition
+RER_cv <- (RER_sd / RER_actual) * 100
+#OF condition
+RER_cv_comp <- (RER_sd_comp / RER_actual_comp) * 100
+
+#-------------------------------------------
+#EU condition
+RER_min <- min(ch$RQ)
+#OF condition
+RER_min_comp <- min(ch_comp$RQ)
+
+#-------------------------------------------
+#EU condition
+RER_max <- max(ch$RQ)
+#OF condition
+RER_max_comp <- max(ch_comp$RQ)
+
+#-------------------------------------------
+#EU condition
+EU_rows <-
+  c(
+    "EU_Test Duration, min",
+#    "Propane Burned, g",
+#    "Burn Rate, g/min",
+    "EU_VO2, l",
+    "EU_VCO2, l",
+    "EU_EE, kcal/24h",
+    "EU_EE, kcal/min",
+    "EU_RER",
+    "EU_RER, SD",
+    "EU_RER, CV",
+    "EU_RER, minimum",
+    "EU_RER, maximum"
+  )
+
+OF_rows <-
+  c(
+    "OF_Test Duration, min",
+#    "Propane Burned, g",
+#    "Burn Rate, g/min",
+    "OF_VO2, l",
+    "OF_VCO2, l",
+    "OF_EE, kcal/24h",
+    "OF_EE, kcal/min",
+    "OF_RER",
+    "OF_RER, SD",
+    "OF_RER, CV",
+    "OF_RER, minimum",
+    "OF_RER, maximum"
+  )
+
+empty <- NA
+
+#-------------------------------------------
+#EU condition
+c2 <-
+  rbind(
+    duration,
+#    propane_burned,
+#    burn_rate,
+    VO2_actual,
+    VCO2_actual,
+    EE_actual,
+    EE_kcal_min_actual,
+    RER_actual,
+    RER_sd,
+    RER_cv,
+    RER_min,
+    RER_max
+  )
+
+#OF condition
+c2_comp <-
+  rbind(
+    duration_comp,
+#    propane_burned,
+#    burn_rate,
+    VO2_actual_comp,
+    VCO2_actual_comp,
+    EE_actual_comp,
+    EE_kcal_min_actual_comp,
+    RER_actual_comp,
+    RER_sd_comp,
+    RER_cv_comp,
+    RER_min_comp,
+    RER_max_comp
+  )
+
+#-------------------------------------------
+#Set up the data frames
+results <- as.data.frame(cbind(EU_rows, c2))
+results_comp <- as.data.frame(cbind(OF_rows, c2_comp))
+
+rownames(results) <- c()
+rownames(results_comp) <- c()
+
+colnames(results) <-
+  c("EU_Variable", "EU_Values")
+colnames(results_comp) <-
+  c("OF_Variable", "OF_Values")
+
+results$EU_Values <-
+  round(as.numeric(results$EU_Values), 2)
+results_comp$OF_Values <-
+  round(as.numeric(results_comp$OF_Values), 2)
+
+#results$Values <-
+#  round(as.numeric(results$Values), 2)
+#results_comp$Values <-
+#  round(as.numeric(results_comp$Values), 2)
+
+
+
+#Uncomment below to view the dataframes:
+results
+results_comp
+
+```
+
+
+## Create a comparision data frame
+
+```{r}
+
+combo<-cbind(results,results_comp)
+
+```
+
+
+
+## Plots
+
+```{r}
+#------------------------------------------------
+o2 <- melt(ch,
+           id = c("index") ,
+           measure = c("O21", "O22"))
+o2_comp <- melt(ch_comp,
+           id = c("index") ,
+           measure = c("O21", "O22"))
+
+
+
+o2$Channel <- o2$variable
+o2_comp$Channel <- o2_comp$variable
+
+o2$variable    <-
+  factor(o2$variable,
+         levels = c("O21", "O22"),
+         labels = c("O21", "O22"))
+o2_comp$variable    <-
+  factor(o2_comp$variable,
+         levels = c("O21", "O22"),
+         labels = c("O21", "O22"))
+
+#seperate and group the data based on the variable (channel as well)
+
+#for O21 variable:
+strip_o21_OF<-o2_comp%>%
+  filter(variable=='O21')
+strip_o21_EU<-o2%>%
+  filter(variable=='O21')
+join_o2<-left_join(strip_021_EU,strip_o21_OF,by='index')
+join_o2_o21<-join_o2%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#for O22 variable:
+strip_o22_OF<-o2_comp%>%
+  filter(variable=='O22')
+strip_022_EU<-o2%>%
+  filter(variable=='O22')
+join_o2_2<-left_join(strip_022_EU,strip_o22_OF,by='index')
+join_o2_o22<-join_o2_2%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#total_o2<-rbind(join_o2_o21,join_o2_o22)
+
+
+v1<-
+  ggplot()+
+  geom_line(data=join_o2_o21,aes(x=index,y=value_EU,color='EU Channel 1'))+
+  geom_line(data=join_o2_o22,aes(x=index,y=value_EU,color='EU Channel 2'),linetype='twodash')+
+  geom_line(data=join_o2_o21,aes(x=index,y=value_OF,color='OF Channel 1'))+
+  geom_line(data=join_o2_o22,aes(x=index,y=value_OF,color='OF Channel 2'),linetype='twodash')+
+  #geom_line(data = total_o2,aes(x=index,y=value_EU,color='EU',linetype=channel))+
+  #geom_line(data = total_o2,aes(x=index,y=value_OF,color='OF',linetype=channel))+
+  scale_color_manual(name='Condition and Channel',
+                     values=c('red','blue','green','black'))+
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "O2, %")+
+  ggtitle("O2: Channels 1 and 2") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme(legend.position="top")+
+  theme_minimal()
+
+#------------------------------------------------
+#For CO2
+co2 <- melt(ch,
+            id = c("index") ,
+            measure = c("CO21", "CO22"))
+co2_comp <- melt(ch_comp,
+            id = c("index") ,
+            measure = c("CO21", "CO22"))
+
+co2$Channel <- co2$variable
+co2_comp$Channel <- co2_comp$variable
+
+co2$variable    <-
+  factor(co2$variable,
+         levels = c("CO21", "CO22"),
+         labels = c("CO21", "CO22"))
+co2_comp$variable    <-
+  factor(co2_comp$variable,
+         levels = c("CO21", "CO22"),
+         labels = c("CO21", "CO22"))
+
+strip_co21_OF<-co2_comp%>%
+  filter(variable=='CO21')
+strip_co21_EU<-co2%>%
+  filter(variable=='CO21')
+join_co2<-left_join(strip_co21_EU,strip_co21_OF,by='index')
+join_co2_o21<-join_co2%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#for cO22 variable:
+strip_co22_OF<-co2_comp%>%
+  filter(variable=='CO22')
+strip_co22_EU<-co2%>%
+  filter(variable=='CO22')
+join_co2_2<-left_join(strip_co22_EU,strip_co22_OF,by='index')
+join_co2_o22<-join_co2_2%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#total_co2<-rbind(join_co2_o21,join_co2_o22)
+
+#For CO2:
+v2<-ggplot()+
+  geom_line(data=join_co2_o21,aes(x=index,y=value_EU,color='EU Channel 1'))+
+  geom_line(data=join_co2_o22,aes(x=index,y=value_EU,color='EU Channel 2'),linetype='twodash')+
+  geom_line(data=join_co2_o21,aes(x=index,y=value_OF,color='OF Channel 1'))+
+  geom_line(data=join_co2_o22,aes(x=index,y=value_OF,color='OF Channel 2'),linetype='twodash')+
+  #geom_line(data = total_co2,aes(x=index,y=value_EU,color='EU',linetype=channel))+
+  #geom_line(data = total_co2,aes(x=index,y=value_OF,color='OF',linetype=channel))+
+  scale_color_manual(name='Condition and Channel',
+                     values=c('red','blue','green','black'))+
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "CO2, %")+
+  ggtitle("CO2: Channels 1 and 2") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme(legend.position="top")+
+  theme_minimal()
+
+
+#------------------------------------------------
+wvp <- melt(ch,
+            id = c("index") ,
+            measure = c("WVP1", "WVP2"))
+wvp_comp <- melt(ch_comp,
+            id = c("index") ,
+            measure = c("WVP1", "WVP2"))
+
+wvp$Channel <- wvp$variable
+wvp_comp$Channel <- wvp_comp$variable
+
+wvp$variable    <-
+  factor(wvp$variable,
+         levels = c("WVP1", "WVP2"),
+         labels = c("WVP1", "WVP2"))
+wvp_comp$variable    <-
+  factor(wvp_comp$variable,
+         levels = c("WVP1", "WVP2"),
+         labels = c("WVP1", "WVP2"))
+
+strip_wvp_OF<-wvp_comp%>%
+  filter(variable=='WVP1')
+strip_wvp_EU<-wvp%>%
+  filter(variable=='WVP1')
+join_wvp<-left_join(strip_wvp_EU,strip_wvp_OF,by='index')
+
+join_wvp1<-join_wvp%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#for wvp2 variable:
+strip_wvp2_OF<-wvp_comp%>%
+  filter(variable=='WVP2')
+strip_wvp2_EU<-wvp%>%
+  filter(variable=='WVP2')
+join_wvp2<-left_join(strip_wvp2_EU,strip_wvp2_OF,by='index')
+
+join_wvp22<-join_wvp2%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#total_co2<-rbind(join_wvp1,join_wvp22)
+
+
+#plotting water vapor pressure:
+
+v4<-ggplot()+
+  geom_line(data=join_wvp1,aes(x=index,y=value_EU,color='EU Channel 1'))+
+  geom_line(data=join_wvp22,aes(x=index,y=value_EU,color='EU Channel 2'),linetype='twodash')+
+  geom_line(data=join_wvp1,aes(x=index,y=value_OF,color='OF Channel 1'))+
+  geom_line(data=join_wvp22,aes(x=index,y=value_OF,color='OF Channel 2'),linetype='twodash')+
+  #geom_line(data = total_co2,aes(x=index,y=value_EU,color='EU',linetype=channel))+
+  #geom_line(data = total_co2,aes(x=index,y=value_OF,color='OF',linetype=channel))+
+  scale_color_manual(name='Condition and Channel',
+                     values=c('red','blue','green','black'))+
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "Water Vapor Pressure") +
+  ggtitle("Water Vapor Pressure: Channels 1 and 2") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme_minimal()
+
+#------------------------------------------------
+
+ss <- melt(ch,
+           id = c("index") ,
+           measure = c("SFR1", "SFR2"))
+ss_comp <- melt(ch_comp,
+           id = c("index") ,
+           measure = c("SFR1", "SFR2"))
+
+ss$Channel <- ss$variable
+ss_comp$Channel <- ss_comp$variable
+
+ss$variable    <-
+  factor(ss$variable,
+         levels = c("SFR1", "SFR2"),
+         labels = c("SFR1", "SFR2"))
+ss_comp$variable    <-
+  factor(ss_comp$variable,
+         levels = c("SFR1", "SFR2"),
+         labels = c("SFR1", "SFR2"))
+
+##Combining the data:
+strip_ss_OF<-ss_comp%>%
+  filter(variable=='SFR1')
+strip_ss_EU<-ss%>%
+  filter(variable=='SFR1')
+join_ss<-left_join(strip_ss_EU,strip_ss_OF,by='index')
+
+join_ss1<-join_ss%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#for wvp2 variable:
+strip_ss2_OF<-ss_comp%>%
+  filter(variable=='SFR2')
+strip_ss2_EU<-ss%>%
+  filter(variable=='SFR2')
+join_ss2<-left_join(strip_ss2_EU,strip_ss2_OF,by='index')
+
+join_ss22<-join_ss2%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#total_co2<-rbind(join_wvp1,join_wvp22)
+
+## Plotting
+
+v3<-ggplot()+
+  geom_line(data=join_ss1,aes(x=index,y=value_EU,color='EU Channel 1'))+
+  geom_line(data=join_ss22,aes(x=index,y=value_EU,color='EU Channel 2'),linetype='twodash')+
+  geom_line(data=join_ss1,aes(x=index,y=value_OF,color='OF Channel 1'))+
+  geom_line(data=join_ss22,aes(x=index,y=value_OF,color='OF Channel 2'),linetype='twodash')+
+  #geom_line(data = total_co2,aes(x=index,y=value_EU,color='EU',linetype=channel))+
+  #geom_line(data = total_co2,aes(x=index,y=value_OF,color='OF',linetype=channel))+
+  scale_color_manual(name='Condition and Channel',
+                     values=c('red','blue','green','black'))+
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "SS Flow Rate, ml/min") +
+  ggtitle("SS Flow Rate: Channels 1 and 2") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme_minimal()
+
+
+#------------------------------------------------
+#For the ratio of oxygen to carbon dioxide:
+
+vo2_vco2 <- melt(ch,
+                 id = c("index") ,
+                 measure = c("VO2", "VCO2"))
+vo2_vco2_comp <- melt(ch_comp,
+                 id = c("index") ,
+                 measure = c("VO2", "VCO2"))
+
+vo2_vco2$Channel <- vo2_vco2$variable
+vo2_vco2_comp$Channel <- vo2_vco2_comp$variable
+
+vo2_vco2$variable    <-
+  factor(
+    vo2_vco2$variable,
+    levels = c("VO2", "VCO2"),
+    labels = c("VO2", "VCO2")
+  )
+vo2_vco2_comp$variable    <-
+  factor(
+    vo2_vco2_comp$variable,
+    levels = c("VO2", "VCO2"),
+    labels = c("VO2", "VCO2")
+  )
+#Combining the data:
+strip_ratio_OF<-vo2_vco2_comp%>%
+  filter(variable=='VO2')
+strip_ratio_EU<-vo2_vco2%>%
+  filter(variable=='VO2')
+join_ratio<-left_join(strip_ratio_EU,strip_ratio_OF,by='index')
+
+join_ratio1<-join_ratio%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+#for second ratio variable:
+strip_ratio2_OF<-vo2_vco2_comp%>%
+  filter(variable=='VCO2')
+strip_ratio2_EU<-vo2_vco2%>%
+  filter(variable=='VCO2')
+join_ratio2<-left_join(strip_ratio2_EU,strip_ratio2_OF,by='index')
+
+join_ratio2_2<-join_ratio2%>%
+  select(index,variable.x,value.x,Channel.x,value.y)%>%
+  rename(variable=variable.x,value_EU=value.x,channel=Channel.x,value_OF=value.y)
+
+
+#Plotting
+
+v6<-
+  ggplot()+
+  geom_line(data=join_ratio1,aes(x=index,y=value_EU,color='EU Channel 1'))+
+  geom_line(data=join_ratio2_2,aes(x=index,y=value_EU,color='EU Channel 2'),linetype='twodash')+
+  geom_line(data=join_ratio1,aes(x=index,y=value_OF,color='OF Channel 1'))+
+  geom_line(data=join_ratio2_2,aes(x=index,y=value_OF,color='OF Channel 2'),linetype='twodash')+
+  #geom_line(data = total_co2,aes(x=index,y=value_EU,color='EU',linetype=channel))+
+  #geom_line(data = total_co2,aes(x=index,y=value_OF,color='OF',linetype=channel))+
+  scale_color_manual(name='Condition and Channel',
+                     values=c('red','blue','green','black'))+
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "VO2 and VCO2") +
+  ggtitle("VO2 and VCO2") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme_minimal()
+
+#------------------------------------------------
+#Plotting flow rate
+
+v5<-ggplot()+
+  geom_line(data=ch,aes(x=index,y=FR,color='EU'))+
+  geom_line(data=ch_comp,aes(x=index,y=FR,color='OF'))+
+  scale_color_manual(name='Condition',
+                     values=c('red','blue'))+
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "Flow Rate") +
+  ggtitle("Flow Rate") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme_minimal()
+
+
+#------------------------------------------------
+#Plotting energy expenditure:
+
+v7 <- ggplot() +
+  geom_line(data=ch, aes(x = index, y = kcal_min,color='EU')) +
+  geom_line(data=ch_comp, aes(x = index, y = kcal_min,color='OF')) +
+  scale_color_manual(name='condition',
+                     values=c("blue", "red")) +
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "EE") +
+  ggtitle("Energy Expenditure") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme_minimal()
+
+#------------------------------------------------
+#plotting RER
+
+v8 <- ggplot() +
+  geom_line(data=ch, aes(x = index, y = RQ,color="EU")) +
+  geom_line(data=ch_comp, aes(x = index, y = RQ,color='OF')) +
+  scale_color_manual(name='condition',
+                     values=c("blue", "red")) +
+  scale_x_continuous(limits = c(0, 1380), breaks = (c(seq(0, 1380, 120)))) +
+  labs(x = "Time, Minutes", y = "RER") +
+  ggtitle("RER") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  theme_minimal() 
+
+```
+
+## Generate the report
+
+```{r}
+library(patchwork)
+
+library(ggpmisc)
+
+t1 <- ggplot() +
+annotate(geom = "table",
+           x = 0,
+           y = 0,
+           label = list(combo))  +
+  ggtitle("Results") +
+  theme_void()
+
+
+#f <- (t1 | v1 | v2) / (v3 | v4 | v5) / (v6 | v7 | v8) + plot_annotation(tag_levels = "1", tag_suffix = '.')
+f <- (t1 | v1 ) / (v2|v3)/(v4 | v5) / (v6 | v7)/(v8) + plot_annotation(tag_levels = "1", tag_suffix = '.')
+
+#f <- (v1 | v2 | v3) / (v4 | v5 | v6) / (v7 | v8 | v9) / (v10 | v11)+ plot_annotation(tag_levels = "1", tag_suffix = '.')
+
+library("stringr")
+output.file <- str_replace_all(txt.file,"INPUT_OF", "OUTPUT") 
+
+output.file <- str_replace_all(output.file,".txt", ".pdf") 
+output.file <- str_replace_all(output.file,"OF", "EU_OF_COMP") 
+
+ggsave(
+  f,
+  file = output.file,
+  width = 20 * 1.9,
+  height = 25.4 * 1.9,
+  units = "cm",
+  dpi = 300
+)
+
+```
